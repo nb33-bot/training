@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>70.3 Training Tracker</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--tx:#14181f;--mut:#667085;--ac:#e5483b;--bd:#e3e6eb;--ok:#12a150;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1116;--card:#171b22;--tx:#eef0f4;--mut:#98a2b3;--bd:#2a303a;--ac:#ff6a5c;--ok:#3ccf7d;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1116;--card:#171b22;--tx:#eef0f4;--mut:#98a2b3;--bd:#2a303a;--ac:#ff6a5c;--ok:#3ccf7d;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:14px 14px 60px}
+h1{font-size:20px;margin:4px 0 10px}h2{font-size:16px;margin:0 0 8px}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+nav button{flex:1;min-width:70px;padding:9px 6px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;font:inherit;cursor:pointer}
+nav button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat b{display:block;font-size:22px}.stat span,.mut{color:var(--mut);font-size:13px}
+input,select,textarea,button{font:inherit;color:var(--tx)}
+input,select,textarea{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px;width:100%;box-sizing:border-box}
+label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:10px}
+.btn{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:9px 14px;cursor:pointer}
+.btn.g{background:var(--bg);color:var(--tx);border:1px solid var(--bd)}
+.row{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--bd)}
+.row:first-of-type{border-top:0}.row .d{width:64px;flex:none}.row .t{flex:1}
+.row.done .t{text-decoration:line-through;opacity:.55}
+input[type=checkbox]{width:20px;height:20px;flex:none;accent-color:var(--ok)}
+.tag{display:inline-block;background:var(--ac);color:#fff;border-radius:99px;padding:1px 9px;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:7px 4px;border-top:1px solid var(--bd)}th{color:var(--mut);font-weight:500;font-size:12px}
+.sc{overflow-x:auto}svg{width:100%;height:auto;display:block}
+.x{background:none;border:0;color:var(--mut);cursor:pointer;font-size:16px}
+</style></head><body><main>
+<h1>🏁 70.3 Training Tracker <span id="sy" class="mut" style="font-size:12px;font-weight:400"></span></h1>
+<nav id="nav"></nav><div id="v"></div>
+<script>
+const day=864e5,DN=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],SP={Swim:'🏊',Bike:'🚴',Run:'🏃',Strength:'🏋️',Rest:'😴',Race:'🏁',Other:'•','Swim+Lift':'🏊🏋️'};
+const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const pd=s=>{const[a,b,c]=s.split('-');return new Date(+a,b-1,+c)};
+const mon=d=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x};
+let S={race:'2027-08-14',goal:'',goalType:'build',start:'',logs:[],weights:[],done:{},rev:0};
+try{const r=localStorage.getItem('t703');if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+let ref=null,tm=null,sync='Local only',first=true;
+const stat=()=>{const e=$('#sy');if(e)e.textContent=sync};
+function seed(){if(!S.start)S.start=iso(mon(new Date()));if(!S.seeded&&!S.weights.length){S.weights.push({id:'w0',d:iso(new Date()),w:175});S.seeded=1}}
+function save(){S.rev=Date.now();gs();try{localStorage.setItem('t703',JSON.stringify(S))}catch(e){}if(ref){sync='Saving…';stat();clearTimeout(tm);tm=setTimeout(()=>ref.set(JSON.parse(JSON.stringify(S))).then(()=>{sync='☁ Synced';stat()},()=>{sync='Sync failed';stat()}),600)}}
+async function initSync(){try{const c=window.claude;if(!c)return;const db=await c.use('db'),u=await c.use('user');if(!db||!u)return;const id=await u.id();if(!id)return;ref=db.doc('data/users/'+id+'/app');
+ ref.onSnapshot(s=>{if(s.exists){const d=s.data();if((d.rev||0)>(S.rev||0)){S=Object.assign(S,JSON.parse(JSON.stringify(d)));try{localStorage.setItem('t703',JSON.stringify(S))}catch(e){}if(!document.activeElement||!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))draw()}else if(first&&(d.rev||0)<S.rev)save();sync='☁ Synced'}else if(first)save();first=false;stat()},()=>{sync='Local only';stat()})}catch(e){}}
+seed();
+const start=()=>pd(S.start),add=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const total=()=>Math.max(8,Math.round((mon(pd(S.race))-start())/(7*day))+1);
+const cur=()=>Math.min(total()-1,Math.max(0,Math.round((mon(new Date())-start())/(7*day))));
+const phase=i=>{const r=total()-i;return r<=1?'Race':r<=3?'Taper':r<=7?'Peak':r<=17?'Build':'Base'};
+function week(i){
+ const T=total(),ph=phase(i),r=T-i,p=Math.min(1,i/Math.max(1,T-8));
+ let k=(ph=='Base'||ph=='Build'||ph=='Peak')&&(i+1)%4==0?.7:1;if(ph=='Taper')k=r==3?.7:.5;
+ const R=x=>Math.round(x*k/5)*5,lb=R(75+165*p),lr=R(50+55*p),sw=R(35+20*p),mb=R(60+30*p),mr=R(40+15*p);
+ if(ph=='Race')return[{sp:'Rest',t:'Rest, mobility',m:0},{sp:'Swim',t:'Easy swim with a few race-pace 50s',m:20},{sp:'Bike',t:'Easy spin, 4×1 min race pace',m:30},{sp:'Run',t:'Easy run + 4 strides',m:20},{sp:'Rest',t:'Travel, check-in, hydrate, carb up',m:0},{sp:'Other',t:'Shakeout: 15 min swim, bike, run',m:45},{sp:'Race',t:'RACE DAY, go kill it',m:0}];
+ const wb={Base:'Steady Z2, cadence drills',Build:'Sweet-spot intervals 3×12 min',Peak:'Race-pace blocks 2×20 min',Taper:'Easy spin, 4×1 min pickups'}[ph];
+ const wr={Base:'Easy Z2 + 4 strides',Build:'Tempo 2×10 min',Peak:'Race-pace 3×10 min',Taper:'Easy + 4 strides'}[ph];
+ const lm={Base:45,Build:40,Peak:30,Taper:20}[ph],LL={Base:'Lower: squat or leg press 4×6, RDL 3×8, split squat 3×8, calves, core',Build:'Lower: squat 3×5, RDL 3×8, step-ups 2×10, core',Peak:'Lower maintenance: squat + RDL 2×5, stop 1–2 reps short of failure',Taper:'Light lower: 2 easy sets, mobility'}[ph],LU={Base:'Upper: bench/OHP 4×6–8, rows + pull-ups 4×8, arms/shoulders 3×12',Build:'Upper: bench/OHP 3×6–8, rows + pull-ups 3×8, arms 2×12',Peak:'Upper maintenance: 2 sets each push/pull, keep it crisp',Taper:'Light upper: 2 easy sets, mobility'}[ph];
+ return[ph=='Base'||ph=='Build'?{sp:'Strength',t:'Optional upper pump, 30 min, easy on the legs',m:30}:{sp:'Rest',t:'Rest, mobility, foam roll',m:0},{sp:'Swim+Lift',t:'Swim: technique + drills. Then '+LL,m:sw+lm},{sp:'Bike',t:wb,m:mb},{sp:'Run',t:wr,m:mr},{sp:'Swim+Lift',t:'Swim: endurance, steady sets. Then '+LU,m:sw+lm},{sp:'Bike',t:'Long ride Z2, practice race nutrition'+(ph=='Peak'?' + 10 min brick run':''),m:lb},{sp:'Run',t:'Long run, easy Z2',m:lr}];
+}
+let tab='Home',wk=cur();
+const TABS=['Home','Roadmap','Plan','Log','Weight','Macros','Setup'];
+function nav(){$('#nav').innerHTML=TABS.map(t=>`<button class="${t==tab?'on':''}" onclick="go('${t}')">${t}</button>`).join('')}
+function go(t){tab=t;if(t=='Plan')wk=cur();draw()}
+const kg=()=>{const w=S.weights.slice().sort((a,b)=>a.d<b.d?-1:1).pop();return w?w.w/2.2046:0};
+const wkHours=i=>{const a=iso(add(start(),i*7)),b=iso(add(start(),i*7+6));return S.logs.filter(l=>l.d>=a&&l.d<=b).reduce((s,l)=>s+l.m,0)};
+function line(pts,fmt){
+ if(pts.length<2)return'<p class="mut">Add at least two entries to see a trend.</p>';
+ const W=600,H=200,xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys)-1,y1=Math.max(...ys)+1;
+ const X=v=>30+(v-x0)/(x1-x0||1)*(W-45),Y=v=>H-25-(v-y0)/(y1-y0||1)*(H-45);
+ return`<svg viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="var(--ac)" stroke-width="2.5" points="${pts.map(p=>X(p.x)+','+Y(p.y)).join(' ')}"/>${pts.map(p=>`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="3.5" fill="var(--ac)"/>`).join('')}<text x="2" y="${Y(y1)+4}" fill="var(--mut)" font-size="11">${y1.toFixed(0)}</text><text x="2" y="${Y(y0)+4}" fill="var(--mut)" font-size="11">${y0.toFixed(0)}</text></svg>`;
+}
+function bars(vals){
+ const W=600,H=170,m=Math.max(1,...vals),bw=(W-30)/vals.length;
+ return`<svg viewBox="0 0 ${W} ${H}">${vals.map((v,i)=>`<rect x="${30+i*bw+3}" y="${H-25-v/m*(H-45)}" width="${bw-6}" height="${v/m*(H-45)}" rx="3" fill="var(--ac)"/><text x="${30+i*bw+bw/2}" y="${H-8}" text-anchor="middle" fill="var(--mut)" font-size="10">${v?v.toFixed(1):''}</text>`).join('')}</svg>`;
+}
+function home(){
+ const t0=new Date();t0.setHours(0,0,0,0);const d=Math.round((pd(S.race)-t0)/day),i=cur(),pl=week(i).reduce((s,x)=>s+x.m,0),lg=wkHours(i);
+ const ws=S.weights.slice().sort((a,b)=>a.d<b.d?-1:1),last=ws[ws.length-1],first=ws[0];
+ const hrs=[];for(let j=Math.max(0,i-11);j<=i;j++)hrs.push(wkHours(j)/60);
+ return`<div class="card"><div class="grid"><div class="stat"><b>${d>0?d:0}</b><span>days to race (${S.race})</span></div><div class="stat"><b>${i+1}/${total()}</b><span>week</span></div><div class="stat"><b><span class="tag">${phase(i)}</span></b><span>phase</span></div><div class="stat"><b>${(lg/60).toFixed(1)} / ${(pl/60).toFixed(1)} h</b><span>logged / planned this week</span></div><div class="stat"><b>${last?last.w+' lb':'–'}</b><span>${last&&first&&ws.length>1?((last.w-first.w>0?'+':'')+(last.w-first.w).toFixed(1)+' since start'):'latest weight'}${S.goal?' · goal '+S.goal:''}</span></div></div></div>
+ <div class="card"><h2>Weekly training hours</h2>${bars(hrs)}</div>`;
+}
+function plan(){
+ const i=wk,w=week(i),a=add(start(),i*7),tot=w.reduce((s,x)=>s+x.m,0);
+ return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><button class="btn g" onclick="wk=Math.max(0,wk-1);draw()">←</button><div style="text-align:center"><b>Week ${i+1} of ${total()}</b> <span class="tag">${phase(i)}</span><div class="mut">${iso(a)} · ${(tot/60).toFixed(1)} h planned${i==cur()?' · this week':''}</div></div><button class="btn g" onclick="wk=Math.min(total()-1,wk+1);draw()">→</button></div></div>
+ <div class="card">${w.map((x,j)=>{const k=i+'-'+j,dt=add(a,j);return`<div class="row ${S.done[k]?'done':''}"><input type="checkbox" ${S.done[k]?'checked':''} onchange="tg('${k}')"><div class="d"><b>${DN[j]}</b><div class="mut" ${iso(dt)==iso(new Date())?'style="color:var(--ac);font-weight:600"':''}>${dt.getMonth()+1}/${dt.getDate()}${iso(dt)==iso(new Date())?' today':''}</div></div><div class="t">${SP[x.sp]} <b>${x.sp}</b> ${x.m?x.m+' min':''}<div class="mut">${x.t}</div></div></div>`}).join('')}</div>
+ <p class="mut">Zones: Z2 = conversational pace. Every 4th week is a lighter recovery week. Adjust freely: this is a template, not gospel.</p>`;
+}
+function tg(k){S.done[k]=!S.done[k];save();draw()}
+function logv(){
+ const ls=S.logs.slice().sort((a,b)=>a.d<b.d?1:-1).slice(0,40);
+ return`<div class="card"><h2>Log a workout</h2><div class="f"><div><label>Date</label><input type="date" id="ld" value="${iso(new Date())}"></div><div><label>Sport</label><select id="ls">${['Swim','Bike','Run','Strength','Other'].map(s=>`<option>${s}</option>`).join('')}</select></div><div><label>Minutes</label><input type="number" id="lm" inputmode="numeric"></div><div><label>Distance (mi; swim yd)</label><input type="number" id="lx" step="any" inputmode="decimal"></div><div><label>Effort 1–10</label><input type="number" id="le" min="1" max="10"></div></div><label>Notes</label><input id="ln" placeholder="How did it feel?"><p><button class="btn" onclick="addLog()">Add workout</button></p></div>
+ <div class="card sc"><h2>Recent workouts</h2>${ls.length?`<table><tr><th>Date</th><th>Sport</th><th>Min</th><th>Dist</th><th>RPE</th><th></th></tr>${ls.map(l=>`<tr><td>${l.d.slice(5)}</td><td>${SP[l.s]} ${l.s}</td><td>${l.m}</td><td>${l.x||''}</td><td>${l.e||''}</td><td><button class="x" onclick="del('logs','${l.id}')">✕</button></td></tr>${l.n?`<tr><td></td><td colspan="5" class="mut">${esc(l.n)}</td></tr>`:''}`).join('')}</table>`:'<p class="mut">Nothing logged yet.</p>'}</div>`;
+}
+function addLog(){const m=+$('#lm').value;if(!m)return;S.logs.push({id:Date.now()+'',d:$('#ld').value,s:$('#ls').value,m,x:+$('#lx').value||0,e:+$('#le').value||0,n:$('#ln').value});save();draw()}
+function del(k,id){S[k]=S[k].filter(x=>x.id!=id);save();draw()}
+function weightv(){
+ const ws=S.weights.slice().sort((a,b)=>a.d<b.d?-1:1);
+ return`<div class="card"><h2>Log weight</h2><div class="f"><div><label>Date</label><input type="date" id="wd" value="${iso(new Date())}"></div><div><label>Weight (lb)</label><input type="number" id="ww" step="0.1" inputmode="decimal"></div></div><button class="btn" onclick="addW()">Add</button></div>
+ <div class="card"><h2>Trend</h2>${line(ws.map(w=>({x:+pd(w.d),y:w.w})))}</div>
+ <div class="card sc"><table><tr><th>Date</th><th>lb</th><th></th></tr>${ws.slice().reverse().slice(0,30).map(w=>`<tr><td>${w.d}</td><td>${w.w}</td><td><button class="x" onclick="del('weights','${w.id}')">✕</button></td></tr>`).join('')}</table></div>`;
+}
+function addW(){const w=+$('#ww').value;if(!w)return;S.weights.push({id:Date.now()+'',d:$('#wd').value,w});save();draw()}
+function macros(){
+ const k=kg(),gt=S.goalType,c=gt=='lean'?.9:gt=='build'?1.1:1;
+ if(!k)return'<div class="card"><p>Log your weight first and your macro ranges will appear here.</p></div>';
+ const P=gt=='build'?[1.8*k,2.2*k]:[1.6*k,2*k],F=[.8*k,1.1*k],T=[['Rest / easy (under 60 min)',3,4,c],['Moderate (1–2 h)',5,6,c],['Big day (2 h+)',7,9,1]];
+ const r=x=>Math.round(x/5)*5;
+ return`<div class="card"><h2>Soft daily macro ranges</h2><p class="mut">Based on ${(k*2.2046).toFixed(1)} lb. Hit protein every day, let carbs follow training, keep fat steady. Aim for the range, not the number.</p>
+ <div class="sc"><table><tr><th>Day type</th><th>Carbs</th><th>Protein</th><th>Fat</th><th>~kcal</th></tr>${T.map(([n,a,b,cc])=>{const C=[a*k*cc,b*k*cc],lo=4*(P[0]+C[0])+9*F[0],hi=4*(P[1]+C[1])+9*F[1];return`<tr><td>${n}</td><td>${r(C[0])}–${r(C[1])} g</td><td>${r(P[0])}–${r(P[1])} g</td><td>${r(F[0])}–${r(F[1])} g</td><td>${Math.round(lo/50)*50}–${Math.round(hi/50)*50}</td></tr>`}).join('')}</table></div></div>
+ <div class="card"><h2>Fueling notes</h2><ul><li>Sessions over 75 min: practice 60–90 g carbs per hour plus fluids and sodium. This trains your gut for race day.</li><li>Eat 20–40 g protein within a couple of hours after hard sessions.</li><li>Race week: raise carbs the last 2–3 days, nothing new at all.</li><li>Leaning out? Do it in base phase, never in peak or taper. Switch the goal in Setup.</li></ul><p class="mut">General guidance, not individualized medical or dietitian advice.</p></div>`;
+}
+function setup(){
+ return`<div class="card"><h2>Settings</h2><div class="f"><div><label>Race date</label><input type="date" id="sr" value="${S.race}"></div><div><label>Goal weight (lb)</label><input type="number" id="sg" value="${S.goal}"></div><div><label>Macro goal</label><select id="sm"><option value="build" ${S.goalType=='build'?'selected':''}>Build muscle (small surplus)</option><option value="maintain" ${S.goalType=='maintain'?'selected':''}>Maintain / perform</option><option value="lean" ${S.goalType=='lean'?'selected':''}>Lean out gently</option></select></div></div><button class="btn" onclick="saveSet()">Save</button></div>
+ ${syncCard()}<div class="card"><h2>Backup</h2><p class="mut">Data is cached in this browser. Connect GitHub sync above to share it across devices; the text below is a manual backup.</p><textarea id="bk" rows="5">${esc(JSON.stringify(S))}</textarea><p><button class="btn g" onclick="imp()">Import</button></p></div>`;
+}
+function saveSet(){S.race=$('#sr').value||S.race;S.goal=$('#sg').value;S.goalType=$('#sm').value;save();tab='Home';draw()}
+function imp(){try{const o=JSON.parse($('#bk').value);S=Object.assign(S,o);save();tab='Home';draw()}catch(e){alert('That backup text could not be read.')}}
+var tm2=null;
+const cfg=()=>{try{return JSON.parse(localStorage.getItem('t703cfg'))||{}}catch(e){return{}}};
+const setCfg=o=>{try{localStorage.setItem('t703cfg',JSON.stringify(Object.assign(cfg(),o)))}catch(e){}};
+const GH='https://api.github.com/gists',GHH=()=>({'Authorization':'Bearer '+cfg().tok,'Accept':'application/vnd.github+json'});
+async function gPush(){const c=cfg();if(!c.tok||!c.gid)return;const r=await fetch(GH+'/'+c.gid,{method:'PATCH',headers:GHH(),body:JSON.stringify({files:{'tracker.json':{content:JSON.stringify(S)}}})});if(!r.ok)throw 0}
+async function gPull(){const c=cfg();if(!c.tok)return;
+ if(!c.gid){const r=await fetch(GH,{method:'POST',headers:GHH(),body:JSON.stringify({description:'70.3 tracker data',public:false,files:{'tracker.json':{content:JSON.stringify(S)}}})});if(!r.ok)throw 0;setCfg({gid:(await r.json()).id});return}
+ const r=await fetch(GH+'/'+c.gid,{headers:GHH()});if(!r.ok)throw 0;const f=(await r.json()).files['tracker.json'];if(!f)throw 0;
+ const d=JSON.parse(f.truncated?await(await fetch(f.raw_url)).text():f.content);
+ if((d.rev||0)>(S.rev||0)){S=Object.assign(S,d);try{localStorage.setItem('t703',JSON.stringify(S))}catch(e){}if(!document.activeElement||!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))draw()}
+ else if((d.rev||0)<(S.rev||0))await gPush()}
+async function gInit(){if(window.claude||!cfg().tok)return;try{sync='Syncing\u2026';stat();await gPull();sync='\u2601 Synced'}catch(e){sync='Sync failed'}stat()}
+function gs(){const c=cfg();if(window.claude||!c.tok||!c.gid)return;sync='Saving\u2026';stat();clearTimeout(tm2);tm2=setTimeout(()=>gPush().then(()=>{sync='\u2601 Synced';stat()},()=>{sync='Sync failed';stat()}),800)}
+function syncCard(){const c=cfg();if(window.claude)return'';return`<div class="card"><h2>Sync between devices</h2><p class="mut">${c.gid?'Connected. On your other devices, paste the same token and this Sync ID.':'Paste a GitHub classic token with only the gist scope. It stays in this browser and is used only to keep your data in a private gist.'}</p><div class="f"><div><label>GitHub token</label><input type="password" id="gt" autocomplete="off" value="${esc(c.tok||'')}"></div><div><label>Sync ID ${c.gid?'':'(leave blank on your first device)'}</label><input id="gi" value="${esc(c.gid||'')}"></div></div><button class="btn" onclick="gConn()">Connect &amp; sync</button> <button class="btn g" onclick="gOff()">Disconnect</button><p class="mut">${esc(sync)}</p></div>`}
+function gConn(){setCfg({tok:$('#gt').value.trim(),gid:$('#gi').value.trim()});gInit().then(draw)}
+function gOff(){try{localStorage.removeItem('t703cfg')}catch(e){}sync='Local only';draw()}
+function roadmap(){
+ const T=total(),ph=['Base','Build','Peak','Taper','Race'],cp=phase(cur());
+ const I={Base:['Build the engine: mostly Z2 swim, bike and run. Fix swim technique, build running durability.','Lifting: your muscle-building window. Progressive overload 2×/week plus the optional upper session.','Food: small surplus on big days, protein around 1.8–2.2 g/kg.','Targets: 1,000 yd continuous swim, 2 h ride, 8 mi run.'],Build:['Add intensity: sweet-spot bike, tempo run, longer swims.','Lifting: 2×/week, hold your strength with less volume. Muscle gain slows here, which is normal.','Food: carbs follow training, practice race fueling on every long session.','Targets: 2,100 yd (1.2 mi) swim, 3 h ride, 10 mi run, plus a tune-up race or time trial.'],Peak:['Race-specific work: race-pace blocks and brick runs.','Lifting: maintenance only, 2 sets, nothing that leaves you sore. Drop heavy legs about 10 days out.','Food: lock in your exact race-day plan, 60–90 g carbs/h.','Targets: 4 h ride, 12 mi run, one full dress-rehearsal day.'],Taper:['Volume drops, a little intensity stays. Sleep is the workout.','Lifting: light and short, or skip.','Food: normal intake, a bit more carbs, nothing new.'],Race:['Race week: shakeouts, travel, gear check, then race day.']};
+ return`<div class="card"><h2>Roadmap to race day</h2><p class="mut">${T} weeks from ${S.start} to ${S.race}. Lifting stays in the plan the whole way and shifts from building to maintaining. Expect slow, modest muscle gain at this training load; holding your strength through Build is a win.</p></div>`+ph.map(p=>{const w=[...Array(T).keys()].filter(i=>phase(i)==p);if(!w.length)return'';const a=iso(add(start(),w[0]*7)),b=iso(add(start(),w[w.length-1]*7+6));return`<div class="card" ${p==cp?'style="border-color:var(--ac)"':''}><h2><span class="tag">${p}</span> Weeks ${w[0]+1}–${w[w.length-1]+1} <span class="mut">${a} → ${b}</span>${p==cp?' · you are here':''}</h2><ul>${I[p].map(x=>`<li>${x}</li>`).join('')}</ul></div>`}).join('');
+}
+function draw(){nav();$('#v').innerHTML={Home:home,Roadmap:roadmap,Plan:plan,Log:logv,Weight:weightv,Macros:macros,Setup:setup}[tab]();stat()}
+setTimeout(initSync,0);setTimeout(gInit,0);document.addEventListener('visibilitychange',()=>{if(!document.hidden)gInit()});
+draw();
+</script></main></body></html>
